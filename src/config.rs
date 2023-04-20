@@ -80,6 +80,7 @@ mod tests {
             assert_eq!(proxy.addr.to_string(), "192.0.2.1:1337")
         }
     }
+
     #[tokio::test]
     async fn test_parse_ipv6() {
         env_logger::init();

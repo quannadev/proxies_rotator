@@ -4,35 +4,6 @@ use std::path::Path;
 use tokio::fs::File;
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, BufReader};
 
-pub async fn load_from_path(path: &Path) -> Result<Vec<SocketAddr>> {
-    let f = File::open(path)
-        .await
-        .with_context(|| anyhow!("Failed to open file: {:?}", path))?;
-    let f = BufReader::new(f);
-    load_from_reader(f).await
-}
-
-async fn load_from_reader<T: AsyncBufRead + Unpin>(f: T) -> Result<Vec<SocketAddr>> {
-    let mut proxies = Vec::new();
-
-    let mut lines = f.lines();
-    while let Some(line) = lines.next_line().await? {
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-
-        let proxy = line
-            .parse::<SocketAddr>()
-            .with_context(|| anyhow!("Invalid proxy in list: {:?}", line))?;
-
-        proxies.push(proxy);
-    }
-
-    info!("Loaded {} proxies from file", proxies.len());
-
-    Ok(proxies)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

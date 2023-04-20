@@ -1,5 +1,5 @@
 #[derive(Clone, Debug)]
-pub struct AuthProxy {
+pub struct ProxyAuth {
     pub username: String,
     pub password: String,
 }

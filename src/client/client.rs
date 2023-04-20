@@ -1,4 +1,4 @@
-use crate::client::auth::AuthProxy;
+use crate::auth::ProxyAuth;
 use crate::client::socket_address_type::SocksAddrType;
 use crate::errors::ClientError;
 use std::net::SocketAddr;
@@ -6,18 +6,18 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 #[derive(Debug)]
-struct Client {
+pub struct Client {
     addr: SocketAddr,
-    port: i16,
-    auth: Option<AuthProxy>,
-    proxy: TcpStream,
+    port: u16,
+    auth: Option<ProxyAuth>,
+    pub proxy: TcpStream,
 }
 
 impl Client {
     pub async fn new(
         addr: SocketAddr,
-        port: i16,
-        auth: Option<AuthProxy>,
+        port: u16,
+        auth: Option<ProxyAuth>,
     ) -> Result<Self, ClientError> {
         let proxy = Self::init_client(addr, auth.clone()).await?;
         Ok(Self {
@@ -28,7 +28,7 @@ impl Client {
         })
     }
 
-    pub async fn connect(&mut self, addr: SocksAddrType<'_>) -> Result<(), ClientError> {
+    pub async fn connect(&mut self, addr: SocksAddrType<'_>, port: u16) -> Result<(), ClientError> {
         let mut buf = [0u8; 2];
         self.proxy
             .read_exact(&mut buf)
@@ -36,7 +36,7 @@ impl Client {
             .map_err(|e| ClientError::Connect(e.to_string()))?;
 
         let mut buf = addr.to_bytes();
-        buf.extend(&self.port.to_be_bytes());
+        buf.extend(&port.to_be_bytes());
         self.proxy
             .write_all(&buf)
             .await
@@ -46,7 +46,7 @@ impl Client {
 
     async fn init_client(
         addr: SocketAddr,
-        auth: Option<AuthProxy>,
+        auth: Option<ProxyAuth>,
     ) -> Result<TcpStream, ClientError> {
         // Send handshake to the proxy server
         log::debug!("start handshake");

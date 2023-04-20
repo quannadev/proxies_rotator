@@ -1,7 +1,6 @@
 // https://github.com/rust-lang/rust-clippy/issues/7271
 #![allow(clippy::needless_lifetimes)]
 
-pub mod args;
 pub mod errors;
 pub mod list;
 pub mod socks5;
@@ -11,15 +10,17 @@ use crate::errors::*;
 use arc_swap::ArcSwap;
 use env_logger::Env;
 use std::sync::Arc;
+use clap::Parser;
 use structopt::StructOpt;
 use tokio::net::TcpListener;
 use tokio::signal::unix::{signal, SignalKind};
+use proxies_rotator::Config;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let args = Args::from_args();
+    let cnf = Config::parse();
 
-    let logging = match (args.quiet, args.verbose) {
+    let logging = match (cnf.quiet, cnf.verbose) {
         (true, _) => "warn",
         (false, 0) => "info",
         (false, 1) => "info,laundry5=debug",
@@ -31,13 +32,13 @@ async fn main() -> Result<()> {
     // a stream of sighup signals
     let mut sighup = signal(SignalKind::hangup())?;
 
-    let proxies = list::load_from_path(&args.proxy_list)
+    let proxies = list::load_from_path(&cnf.proxy_list)
         .await
         .context("Failed to load proxy list")?;
     let proxies = ArcSwap::from(Arc::new(proxies));
 
-    info!("Binding listener to {}", args.bind);
-    let listener = TcpListener::bind(args.bind).await?;
+    info!("Binding listener to {}", cnf.bind);
+    let listener = TcpListener::bind(cnf.bind).await?;
 
     loop {
         tokio::select! {
@@ -59,7 +60,7 @@ async fn main() -> Result<()> {
             }
             _ = sighup.recv() => {
                 debug!("Got signal HUP");
-                match list::load_from_path(&args.proxy_list).await {
+                match list::load_from_path(&cnf.proxy_list).await {
                     Ok(list) => {
                         let list = Arc::new(list);
                         proxies.store(list);

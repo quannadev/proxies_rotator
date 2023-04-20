@@ -5,46 +5,33 @@ use std::net::SocketAddr;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-#[derive(Debug)]
-pub struct Client {
-    addr: SocketAddr,
-    port: u16,
-    auth: Option<ProxyAuth>,
-    pub proxy: TcpStream,
-}
+#[derive(Debug, Default)]
+pub struct Client {}
 
 impl Client {
-    pub async fn new(
-        addr: SocketAddr,
+    pub async fn connect(
+        &self,
+        proxy: &mut TcpStream,
+        addr: SocksAddrType<'_>,
         port: u16,
-        auth: Option<ProxyAuth>,
-    ) -> Result<Self, ClientError> {
-        let proxy = Self::init_client(addr, auth.clone()).await?;
-        Ok(Self {
-            port,
-            auth,
-            addr,
-            proxy,
-        })
-    }
-
-    pub async fn connect(&mut self, addr: SocksAddrType<'_>, port: u16) -> Result<(), ClientError> {
+    ) -> Result<(), ClientError> {
         let mut buf = [0u8; 2];
-        self.proxy
+        proxy
             .read_exact(&mut buf)
             .await
             .map_err(|e| ClientError::Connect(e.to_string()))?;
 
         let mut buf = addr.to_bytes();
         buf.extend(&port.to_be_bytes());
-        self.proxy
+        proxy
             .write_all(&buf)
             .await
             .map_err(|e| ClientError::Connect(e.to_string()))?;
         Ok(())
     }
 
-    async fn init_client(
+    pub async fn init_socket(
+        &self,
         addr: SocketAddr,
         auth: Option<ProxyAuth>,
     ) -> Result<TcpStream, ClientError> {

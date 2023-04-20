@@ -1,7 +1,6 @@
 #![allow(clippy::needless_lifetimes)]
 
 pub mod errors;
-pub mod list;
 
 use clap::Parser;
 use env_logger::Env;

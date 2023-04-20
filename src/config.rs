@@ -1,20 +1,20 @@
 use crate::errors::ServerError;
-use clap;
+use crate::Proxy;
 use clap::Parser;
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tokio::fs::File;
 use tokio::io::{AsyncBufRead, AsyncBufReadExt, BufReader};
 
 #[derive(Debug, Clone, Parser)]
 pub struct Config {
-    #[clap(long, env)]
+    #[clap(short, long, env, default_value_t = false)]
     pub quiet: bool,
-    #[clap(long, env)]
+    #[clap(short, long, env, default_value_t = 0)]
     pub verbose: u8,
-    #[clap(long, env)]
+    #[clap(short, long, env, default_value = "0.0.0.0:1379")]
     pub bind: SocketAddr,
-    #[clap(long, env)]
+    #[clap(short, long, env)]
     pub proxy_list: PathBuf,
 }
 
@@ -23,12 +23,13 @@ impl Config {
         match (self.quiet, self.verbose) {
             (true, _) => "warn",
             (false, 0) => "info",
-            (false, 1) => "info,laundry5=debug",
+            (false, 1) => "info,proxies_rotator=debug",
             (false, 2) => "debug",
-            (false, _) => "debug,laundry5=trace",
+            (false, _) => "debug,proxies_rotator=trace",
         }
     }
-    pub async fn load_proxies_from_path(&self) -> Result<Vec<SocketAddr>, ServerError> {
+
+    pub async fn load_proxies_from_path(&self) -> Result<Vec<Proxy>, ServerError> {
         let f = File::open(self.proxy_list.clone()).await.map_err(|_| {
             ServerError::Parser(format!("Failed to open file: {:?}", self.proxy_list))
         })?;
@@ -38,7 +39,7 @@ impl Config {
 
     async fn load_proxies_from_reader<T: AsyncBufRead + Unpin>(
         f: T,
-    ) -> Result<Vec<SocketAddr>, ServerError> {
+    ) -> Result<Vec<Proxy>, ServerError> {
         let mut proxies = Vec::new();
 
         let mut lines = f.lines();
@@ -50,12 +51,12 @@ impl Config {
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
-
-            let proxy = line
-                .parse::<SocketAddr>()
-                .map_err(|_| ServerError::Parser(format!("Invalid proxy in list: {:?}", line)))?;
-
-            proxies.push(proxy);
+            match Proxy::try_from(line.clone()) {
+                Ok(proxy) => {
+                    proxies.push(proxy);
+                }
+                _ => {}
+            }
         }
 
         log::info!("Loaded {} proxies from file", proxies.len());

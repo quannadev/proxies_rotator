@@ -41,7 +41,7 @@ impl ProxyServer {
                         //todo rotate proxy
                         let proxy = proxies.first().unwrap().clone();
                         let client = Client::default();
-                        if let Ok(mut stream) = client.init_socket(proxy.addr, Some(proxy.auth)).await {
+                        if let Ok(mut stream) = client.init_socket(proxy.addr, proxy.auth).await {
                             let mut buf = [0u8; 255];
                              match client.handshake_target(&mut socket, &mut buf).await {
                                 Ok((addr, port)) => {

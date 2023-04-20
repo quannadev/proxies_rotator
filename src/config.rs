@@ -37,7 +37,7 @@ impl Config {
         Self::load_proxies_from_reader(f).await
     }
 
-    async fn load_proxies_from_reader<T: AsyncBufRead + Unpin>(
+    pub async fn load_proxies_from_reader<T: AsyncBufRead + Unpin>(
         f: T,
     ) -> Result<Vec<Proxy>, ServerError> {
         let mut proxies = Vec::new();
@@ -51,16 +51,46 @@ impl Config {
             if line.is_empty() || line.starts_with('#') {
                 continue;
             }
-            match Proxy::try_from(line.clone()) {
-                Ok(proxy) => {
-                    proxies.push(proxy);
-                }
-                _ => {}
+            if let Ok(proxy) = Proxy::try_from(line.clone()) {
+                proxies.push(proxy);
             }
         }
 
         log::info!("Loaded {} proxies from file", proxies.len());
 
         Ok(proxies)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+    use tokio::io::BufReader;
+
+    #[tokio::test]
+    async fn test_parse_ipv4() {
+        let buf = b"192.0.2.1:1337";
+        let reader = BufReader::new(Cursor::new(buf));
+        let list = Config::load_proxies_from_reader(reader).await.unwrap();
+        for proxy in list {
+            assert!(proxy.auth.is_none());
+            assert!(proxy.addr.is_ipv4());
+            assert_eq!(proxy.addr.port(), 1337);
+            assert_eq!(proxy.addr.to_string(), "192.0.2.1:1337")
+        }
+    }
+    #[tokio::test]
+    async fn test_parse_ipv6() {
+        env_logger::init();
+        let buf = b"[2001:db8::12:34]:1337";
+        let reader = BufReader::new(Cursor::new(buf));
+        let list = Config::load_proxies_from_reader(reader).await.unwrap();
+        for proxy in list {
+            assert!(proxy.auth.is_none());
+            assert!(proxy.addr.is_ipv6());
+            assert_eq!(proxy.addr.port(), 1337);
+            assert_eq!(proxy.addr.to_string(), "[2001:db8::12:34]:1337")
+        }
     }
 }

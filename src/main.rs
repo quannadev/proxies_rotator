@@ -19,15 +19,7 @@ use proxies_rotator::Config;
 #[tokio::main]
 async fn main() -> Result<()> {
     let cnf = Config::parse();
-
-    let logging = match (cnf.quiet, cnf.verbose) {
-        (true, _) => "warn",
-        (false, 0) => "info",
-        (false, 1) => "info,laundry5=debug",
-        (false, 2) => "debug",
-        (false, _) => "debug,laundry5=trace",
-    };
-    env_logger::init_from_env(Env::default().default_filter_or(logging));
+    env_logger::init_from_env(Env::default().default_filter_or(cnf.get_logging_cnf()));
 
     // a stream of sighup signals
     let mut sighup = signal(SignalKind::hangup())?;

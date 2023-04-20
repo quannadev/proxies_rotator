@@ -1,5 +1,5 @@
 mod client;
-mod utils;
 mod config;
+mod utils;
 
 pub use config::Config;
